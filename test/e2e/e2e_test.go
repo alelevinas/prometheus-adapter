@@ -109,9 +109,10 @@ func waitForPrometheusReady(ctx context.Context, namespace string, name string) 
 		var reconciled, available *monitoringv1.Condition
 		for _, condition := range prom.Status.Conditions {
 			cond := condition
-			if cond.Type == monitoringv1.Reconciled {
+			switch cond.Type {
+			case monitoringv1.Reconciled:
 				reconciled = &cond
-			} else if cond.Type == monitoringv1.Available {
+			case monitoringv1.Available:
 				available = &cond
 			}
 		}

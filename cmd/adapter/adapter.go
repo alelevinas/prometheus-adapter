@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -38,10 +39,11 @@ import (
 	"k8s.io/component-base/logs"
 	"k8s.io/klog/v2"
 
+	"sigs.k8s.io/metrics-server/pkg/api"
+
 	customexternalmetrics "sigs.k8s.io/custom-metrics-apiserver/pkg/apiserver"
 	basecmd "sigs.k8s.io/custom-metrics-apiserver/pkg/cmd"
 	"sigs.k8s.io/custom-metrics-apiserver/pkg/provider"
-	"sigs.k8s.io/metrics-server/pkg/api"
 
 	generatedopenapi "sigs.k8s.io/prometheus-adapter/pkg/api/generated/openapi"
 	prom "sigs.k8s.io/prometheus-adapter/pkg/client"
@@ -370,16 +372,8 @@ func main() {
 		klog.Fatalf("unable to install resource metrics API: %v", err)
 	}
 
-	// disable HTTP/2 to mitigate CVE-2023-44487 until the Go standard library
-	// and golang.org/x/net are fully fixed.
-	server, err := cmd.Server()
-	if err != nil {
-		klog.Fatalf("unable to fetch server: %v", err)
-	}
-	server.GenericAPIServer.SecureServingInfo.DisableHTTP2 = cmd.DisableHTTP2
-
 	// run the server
-	if err := cmd.Run(stopCh); err != nil {
+	if err := cmd.Run(context.Background()); err != nil {
 		klog.Fatalf("unable to run custom metrics adapter: %v", err)
 	}
 }

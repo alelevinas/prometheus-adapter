@@ -1,15 +1,15 @@
-REGISTRY?=gcr.io/k8s-staging-prometheus-adapter
-IMAGE=prometheus-adapter
+REGISTRY?=alejandro/k8s-staging-prometheus-adapter-fork
+IMAGE=prometheus-adapter-fork
 ARCH?=$(shell go env GOARCH)
 ALL_ARCH=amd64 arm arm64 ppc64le s390x
-GOPATH:=$(shell go env GOPATH)
+GOPATH:=$(shell go env GOPATH | cut -d: -f1)
 
 VERSION=$(shell cat VERSION)
 TAG_PREFIX=v
 TAG?=$(TAG_PREFIX)$(VERSION)
 
-GO_VERSION?=1.22.5
-GOLANGCI_VERSION?=1.56.2
+GO_VERSION?=1.24.6
+GOLANGCI_VERSION?=2.1.6
 
 .PHONY: all
 all: prometheus-adapter
@@ -72,7 +72,7 @@ update: update-lint update-generated
 # Format and lint
 # ---------------
 
-HAS_GOLANGCI_VERSION:=$(shell $(GOPATH)/bin/golangci-lint version --format=short)
+HAS_GOLANGCI_VERSION:=$(shell $(GOPATH)/bin/golangci-lint version --short)
 .PHONY: golangci
 golangci:
 ifneq ($(HAS_GOLANGCI_VERSION), $(GOLANGCI_VERSION))
