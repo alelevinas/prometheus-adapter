@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -38,10 +39,11 @@ import (
 	"k8s.io/component-base/logs"
 	"k8s.io/klog/v2"
 
+	"sigs.k8s.io/metrics-server/pkg/api"
+
 	customexternalmetrics "sigs.k8s.io/custom-metrics-apiserver/pkg/apiserver"
 	basecmd "sigs.k8s.io/custom-metrics-apiserver/pkg/cmd"
 	"sigs.k8s.io/custom-metrics-apiserver/pkg/provider"
-	"sigs.k8s.io/metrics-server/pkg/api"
 
 	generatedopenapi "sigs.k8s.io/prometheus-adapter/pkg/api/generated/openapi"
 	prom "sigs.k8s.io/prometheus-adapter/pkg/client"
@@ -49,6 +51,7 @@ import (
 	adaptercfg "sigs.k8s.io/prometheus-adapter/pkg/config"
 	cmprov "sigs.k8s.io/prometheus-adapter/pkg/custom-provider"
 	extprov "sigs.k8s.io/prometheus-adapter/pkg/external-provider"
+	"sigs.k8s.io/prometheus-adapter/pkg/monitoring"
 	"sigs.k8s.io/prometheus-adapter/pkg/naming"
 	resprov "sigs.k8s.io/prometheus-adapter/pkg/resourceprovider"
 )
@@ -280,12 +283,6 @@ func (cmd *PrometheusAdapter) addResourceMetricsAPI(promClient prom.Client, stop
 		return err
 	}
 
-	metricsHandler, err := mprom.MetricsHandler()
-	if err != nil {
-		return err
-	}
-	server.GenericAPIServer.Handler.NonGoRestfulMux.HandleFunc("/metrics", metricsHandler)
-
 	if err := api.Install(provider, podInformer.Lister(), informer.Core().V1().Nodes().Lister(), server.GenericAPIServer, nil); err != nil {
 		return err
 	}
@@ -298,6 +295,8 @@ func (cmd *PrometheusAdapter) addResourceMetricsAPI(promClient prom.Client, stop
 func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()
+
+	monitoring.ServePrometheusMetrics(8080)
 
 	// set up flags
 	cmd := &PrometheusAdapter{
@@ -370,16 +369,8 @@ func main() {
 		klog.Fatalf("unable to install resource metrics API: %v", err)
 	}
 
-	// disable HTTP/2 to mitigate CVE-2023-44487 until the Go standard library
-	// and golang.org/x/net are fully fixed.
-	server, err := cmd.Server()
-	if err != nil {
-		klog.Fatalf("unable to fetch server: %v", err)
-	}
-	server.GenericAPIServer.SecureServingInfo.DisableHTTP2 = cmd.DisableHTTP2
-
 	// run the server
-	if err := cmd.Run(stopCh); err != nil {
+	if err := cmd.Run(context.Background()); err != nil {
 		klog.Fatalf("unable to run custom metrics adapter: %v", err)
 	}
 }

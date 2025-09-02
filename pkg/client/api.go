@@ -54,9 +54,10 @@ func (c *httpAPIClient) Do(ctx context.Context, verb, endpoint string, query url
 	u := *c.baseURL
 	u.Path = path.Join(c.baseURL.Path, endpoint)
 	var reqBody io.Reader
-	if verb == http.MethodGet {
+	switch verb {
+	case http.MethodGet:
 		u.RawQuery = query.Encode()
-	} else if verb == http.MethodPost {
+	case http.MethodPost:
 		reqBody = strings.NewReader(query.Encode())
 	}
 
@@ -235,7 +236,7 @@ func (h *queryClient) QueryRange(ctx context.Context, r Range, query Selector) (
 // when present
 func timeoutFromContext(ctx context.Context) (time.Duration, bool) {
 	if deadline, hasDeadline := ctx.Deadline(); hasDeadline {
-		return time.Since(deadline), true
+		return time.Until(deadline), true
 	}
 
 	return time.Duration(0), false

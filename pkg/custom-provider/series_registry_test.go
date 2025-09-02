@@ -268,7 +268,7 @@ var _ = Describe("Series Registry", func() {
 		}
 
 		for _, tc := range testCases {
-			tc := tc // copy to avoid iteration variable issues
+			// copy to avoid iteration variable issues
 			It(fmt.Sprintf("should build a query for %s", tc.title), func() {
 				By(fmt.Sprintf("composing the query for the %s metric on %v in namespace %s", tc.info, tc.resourceNames, tc.namespace))
 				outputQuery, found := registry.QueryForMetric(tc.info, tc.namespace, tc.metricSelector, tc.resourceNames...)

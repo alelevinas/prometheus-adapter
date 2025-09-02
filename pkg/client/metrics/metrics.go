@@ -18,15 +18,11 @@ package metrics
 
 import (
 	"context"
-	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
-	apimetrics "k8s.io/apiserver/pkg/endpoints/metrics"
-	"k8s.io/component-base/metrics"
-	"k8s.io/component-base/metrics/legacyregistry"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"sigs.k8s.io/prometheus-adapter/pkg/client"
 )
@@ -35,30 +31,17 @@ var (
 	// queryLatency is the total latency of any query going through the
 	// various endpoints (query, range-query, series).  It includes some deserialization
 	// overhead and HTTP overhead.
-	queryLatency = metrics.NewHistogramVec(
-		&metrics.HistogramOpts{
+	queryLatency = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
 			Namespace: "prometheus_adapter",
 			Subsystem: "prometheus_client",
 			Name:      "request_duration_seconds",
 			Help:      "Prometheus client query latency in seconds.  Broken down by target prometheus endpoint and target server",
 			Buckets:   prometheus.DefBuckets,
 		},
-		[]string{"path", "server"},
+		[]string{"path", "server", "query", "status"},
 	)
 )
-
-func MetricsHandler() (http.HandlerFunc, error) {
-	registry := metrics.NewKubeRegistry()
-	err := registry.Register(queryLatency)
-	if err != nil {
-		return nil, err
-	}
-	apimetrics.Register()
-	return func(w http.ResponseWriter, req *http.Request) {
-		legacyregistry.Handler().ServeHTTP(w, req)
-		metrics.HandlerFor(registry, metrics.HandlerOpts{}).ServeHTTP(w, req)
-	}, nil
-}
 
 // instrumentedClient is a client.GenericAPIClient which instruments calls to Do,
 // capturing request latency.
@@ -70,6 +53,7 @@ type instrumentedGenericClient struct {
 func (c *instrumentedGenericClient) Do(ctx context.Context, verb, endpoint string, query url.Values) (client.APIResponse, error) {
 	startTime := time.Now()
 	var err error
+	var resp client.APIResponse
 	defer func() {
 		endTime := time.Now()
 		// skip calls where we don't make the actual request
@@ -79,10 +63,9 @@ func (c *instrumentedGenericClient) Do(ctx context.Context, verb, endpoint strin
 				return
 			}
 		}
-		queryLatency.With(prometheus.Labels{"path": endpoint, "server": c.serverName}).Observe(endTime.Sub(startTime).Seconds())
+		queryLatency.With(prometheus.Labels{"path": endpoint, "server": c.serverName, "query": query.Get("match[]"), "status": string(resp.Status)}).Observe(endTime.Sub(startTime).Seconds())
 	}()
 
-	var resp client.APIResponse
 	resp, err = c.client.Do(ctx, verb, endpoint, query)
 	return resp, err
 }
